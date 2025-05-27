@@ -28,5 +28,5 @@
 1. The incoming run data files use the same set of 41 sensors ("Sensor_1" to "Sensor_41")
 
 ### Attempting to eliminate collinearity
-1. The newly created `Run Duration` column is collinear with all the other columns together.
+1. The newly created `Run Duration` column is collinear with all the other columns jointly.
 1. The `Time Stamp` column is almost linearly related to the `Run Start Time` column.
