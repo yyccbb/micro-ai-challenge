@@ -98,7 +98,8 @@ def validate_epoch(model, val_loader, criterion, device):
 
     return total_loss / num_batches
 
-def train_model(model, train_loader, val_loader, num_epochs=40, learning_rate=1e-3, device='cuda' if torch.cuda.is_available() else 'cpu', patience=10, min_delta=1e-4):
+def train_model(model, train_loader, val_loader, num_epochs=40, learning_rate=1e-3, device='cuda' if torch.cuda.is_available() else 'cpu', patience=10, min_delta=1e-4, model_save_path="best_model.pth"
+):
     model.to(device)
 
     criterion = nn.MSELoss()
@@ -130,7 +131,7 @@ def train_model(model, train_loader, val_loader, num_epochs=40, learning_rate=1e
             best_val_loss = val_loss
             patience_counter = 0
             # Save best model weights
-            torch.save(model.state_dict(), 'best_model.pth')
+            torch.save(model.state_dict(), model_save_path)
         else:
             patience_counter += 1
 
@@ -140,7 +141,7 @@ def train_model(model, train_loader, val_loader, num_epochs=40, learning_rate=1e
 
         print("-" * 20)
 
-    model.load_state_dict(torch.load('best_model.pth'))
+    model.load_state_dict(torch.load(model_save_path))
 
     return train_losses, val_losses
 
