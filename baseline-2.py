@@ -123,35 +123,29 @@ summary(
     )
 )
 
+directory_path = os.path.dirname(os.path.abspath(__file__))
 
-
-
-run_matrices = load('run_matrices.joblib')
-incoming_run_matrices = load('incoming_run_matrices.joblib')
-metrology_matrix = load('metrology_matrix.joblib')
+run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
+incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
+metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix.joblib'))
 
 X_run = torch.from_numpy(run_matrices).float()
 X_incoming_run = torch.from_numpy(incoming_run_matrices).float()
 y = torch.from_numpy(metrology_matrix).float()
 print(X_run.shape, X_incoming_run.shape, y.shape)
 
-
-
 baseline_2_model = DualLSTMModel2(
     run_hidden_size=128,
     incoming_run_hidden_size=128,
     num_layers=1,
     dropout=0.2,
-    ff_hidden_sizes=[128, 64]
+    ff_hidden_sizes=[256, 128]
 )
 
-train_loader, val_loader, test_loader = create_data_loaders(X_run, X_incoming_run, y, train_ratio=0.7, val_ratio=0.1, batch_size=BATCH_SIZE, random_state=RANDOM_STATE)
+train_loader, val_loader, test_loader = create_data_loaders(X_run, X_incoming_run, y, train_ratio=0.7, val_ratio=0.1, batch_size=BATCH_SIZE, standardize=True, random_state=RANDOM_STATE)
 
 train_losses, val_losses = train_model(baseline_2_model, train_loader, val_loader, num_epochs=NUM_EPOCHS, learning_rate=LEARNING_RATE, patience=PATIENCE, min_delta=MIN_DELTA, model_save_path='baseline-2-best-model.pth')
 
-
-
 test_results = test_model(baseline_2_model, test_loader)
-
 
 print({k: test_results[k] for k in ['test_loss', 'mse', 'mae', 'r2_score']})

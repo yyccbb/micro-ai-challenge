@@ -14,12 +14,10 @@ from utils import create_data_loaders, train_model, test_model
 
 RANDOM_STATE = 42
 BATCH_SIZE = 32
-NUM_EPOCHS = 40
+NUM_EPOCHS = 100
 LEARNING_RATE = 1e-3
 PATIENCE = 20
 MIN_DELTA = 1e-4
-
-
 
 class DualLSTMModel(nn.Module):
     def __init__(self,
@@ -92,9 +90,6 @@ class DualLSTMModel(nn.Module):
             out_incoming_run = h2_n[-1]
 
         return self.fead_forward(torch.concat([out_run, out_incoming_run], dim=1))
-    
-
-
 
 # Model summary
 from torchinfo import summary
@@ -104,33 +99,33 @@ model = DualLSTMModel()
 summary(
     model,
     input_data=(
-        torch.randn(32, 755, 20),  # x1: batch_size=8, seq_len=10, feature_dim=20
+        torch.randn(32, 755, 20),  # x1
         torch.randn(32, 755, 45),  # x2
         torch.full((32,), 700),    # lengths1
         torch.full((32,), 700)     # lengths2
     )
 )
 
+directory_path = os.path.dirname(os.path.abspath(__file__))
 
-run_matrices = load('run_matrices.joblib')
-incoming_run_matrices = load('incoming_run_matrices.joblib')
-metrology_matrix = load('metrology_matrix.joblib')
+run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
+incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
+metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix.joblib'))
 
 X_run = torch.from_numpy(run_matrices).float()
 X_incoming_run = torch.from_numpy(incoming_run_matrices).float()
 y = torch.from_numpy(metrology_matrix).float()
 print(X_run.shape, X_incoming_run.shape, y.shape)
 
-
 baseline_1_model = DualLSTMModel(
     run_hidden_size=128,
     incoming_run_hidden_size=128,
     num_layers=1,
     dropout=0.2,
-    ff_hidden_sizes=[128, 64]
+    ff_hidden_sizes=[256, 128]
 )
 
-train_loader, val_loader, test_loader = create_data_loaders(X_run, X_incoming_run, y, train_ratio=0.7, val_ratio=0.1, batch_size=BATCH_SIZE, random_state=RANDOM_STATE)
+train_loader, val_loader, test_loader = create_data_loaders(X_run, X_incoming_run, y, train_ratio=0.7, val_ratio=0.1, batch_size=BATCH_SIZE, standardize=True, random_state=RANDOM_STATE)
 
 train_losses, val_losses = train_model(baseline_1_model, train_loader, val_loader, num_epochs=NUM_EPOCHS, learning_rate=LEARNING_RATE, patience=PATIENCE, min_delta=MIN_DELTA, model_save_path='baseline-1-best-model.pth')
 
