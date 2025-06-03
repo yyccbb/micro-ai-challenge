@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
+from math import sqrt
 
 class TimeSeriesDataset(torch.utils.data.Dataset):
-    def __init__(self, x1, x2, y, padding_value=0.0):
+    def __init__(self, x1, x2, y, lengths1, lengths2, padding_value=0.0):
         """
         Args:
             x1: (4140, 755, 20) tensor
@@ -36,17 +37,79 @@ def get_sequence_lengths(x, padding_value=0.0):
     lengths = mask.size(1) - reversed_mask.int().argmax(dim=1)
     return lengths.to(dtype=torch.long, device=x.device)
 
-def create_data_loaders(x1, x2, y, train_ratio=0.8, val_ratio=0.1, batch_size=32, shuffle=False, num_workers=0, padding_value=0.0, random_state=42):
-    dataset = TimeSeriesDataset(x1, x2, y, padding_value)
+def create_mask_from_lengths(lengths, max_length):
+    batch_size = lengths.shape[0]
+    range_tensor = torch.arange(max_length, device=lengths.device).unsqueeze(0).expand(batch_size, -1)
+    return range_tensor < lengths.unsqueeze(1)
 
-    total_size = len(dataset)
+def compute_standardization_stats(x, mask=None, dim=(0, 1), epsilon=1e-8):
+    if mask is not None:
+        float_mask = mask.float()
+        while float_mask.dim() < x.dim():
+            float_mask = float_mask.unsqueeze(-1)
+
+        x_sum = torch.sum((float_mask * x), dim=dim, keepdim=True)
+        count = torch.sum(float_mask, dim=dim, keepdim=True) # TODO: Check whether division by 0 could occur
+        x_mean = x_sum / count
+
+        x_var = torch.sum(((x - x_mean) * float_mask) ** 2, dim=dim, keepdim=True) / (count - 1).clamp(min=1)
+        x_std = torch.sqrt(x_var + epsilon)
+    else:
+        x_mean = torch.mean(x, dim=dim, keepdim=True)
+        x_std = torch.std(x, dim=dim, keepdim=True).clamp(min=sqrt(epsilon))
+
+    return x_mean, x_std
+
+def standardize_data(x, x_mean, x_std, mask=None, padding_value=0.0):
+    standardized = (x - x_mean) / x_std
+    if mask is not None:
+        expanded_mask = mask
+        while expanded_mask.dim() < standardized.dim():
+            expanded_mask = expanded_mask.unsqueeze(-1)
+        standardized = torch.where(expanded_mask, standardized, padding_value)
+
+    return standardized
+
+def create_data_loaders(x1, x2, y, train_ratio=0.8, val_ratio=0.1, batch_size=32, shuffle=False, standardize=True, num_workers=0, padding_value=0.0, random_state=42):
+    total_size = len(x1)
     train_size = int(train_ratio * total_size)
     val_size = int(val_ratio * total_size)
     test_size = total_size - train_size - val_size
 
-    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
-        dataset, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(random_state)
-    )
+    # Create indices for splits
+    indices = torch.randperm(total_size, generator=torch.Generator().manual_seed(random_state))
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:train_size+val_size]
+    test_indices = indices[train_size+val_size:]
+
+    lengths1 = get_sequence_lengths(x1, padding_value)
+    lengths2 = get_sequence_lengths(x2, padding_value)
+
+    if standardize:
+        x1_train = x1[train_indices]
+        x2_train = x2[train_indices]
+        # TODO: Test whether need to standardize y
+
+        lengths1_train = get_sequence_lengths(x1_train, padding_value)
+        lengths2_train = get_sequence_lengths(x2_train, padding_value)
+
+        mask1_train = create_mask_from_lengths(lengths1_train, x1_train.size(1))
+        mask2_train = create_mask_from_lengths(lengths2_train, x2_train.size(1))
+
+        x1_mean, x1_std = compute_standardization_stats(x1_train, mask1_train, dim=(0, 1))
+        x2_mean, x2_std = compute_standardization_stats(x2_train, mask2_train, dim=(0, 1))
+
+        mask1 = create_mask_from_lengths(lengths1, x1.size(1))
+        mask2 = create_mask_from_lengths(lengths2, x2.size(1))
+
+        x1 = standardize_data(x1, x1_mean, x1_std, mask1, padding_value)
+        x2 = standardize_data(x2, x2_mean, x2_std, mask2, padding_value)
+
+    dataset = TimeSeriesDataset(x1, x2, y, lengths1, lengths2, padding_value)
+
+    train_dataset = torch.utils.data.Subset(dataset, train_indices)
+    val_dataset = torch.utils.data.Subset(dataset, val_indices)
+    test_dataset = torch.utils.data.Subset(dataset, test_indices)
 
     loader_kwargs = dict(batch_size=batch_size, num_workers=num_workers, pin_memory=True) # TODO: Try pin_memory=False
 
@@ -141,7 +204,7 @@ def train_model(model, train_loader, val_loader, num_epochs=40, learning_rate=1e
 
         print("-" * 20)
 
-    model.load_state_dict(torch.load(model_save_path))
+    model.load_state_dict(torch.load(model_save_path, weights_only=True))
 
     return train_losses, val_losses
 
