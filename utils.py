@@ -163,12 +163,13 @@ def validate_epoch(model, val_loader, criterion, device):
 
 def train_model(model, train_loader, val_loader, num_epochs=40, learning_rate=1e-3, device='cuda' if torch.cuda.is_available() else 'cpu', patience=10, min_delta=1e-4, model_save_path="best_model.pth"
 ):
+    print(f"device: {device}")
     model.to(device)
 
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) # TODO: Try AdamW, try weight_decay=1e-5
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=5, verbose=True
+        optimizer, mode='min', factor=0.5, patience=5
     ) # TODO: Try different hyperparameters
 
     best_val_loss = float('inf')
