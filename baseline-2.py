@@ -11,7 +11,6 @@ from tqdm import tqdm
 
 from utils import create_data_loaders, train_model, test_model
 
-
 RANDOM_STATE = 42
 BATCH_SIZE = 32
 NUM_EPOCHS = 100
@@ -20,15 +19,14 @@ PATIENCE = 20
 MIN_DELTA = 1e-4
 
 
-
 class DualLSTMModel2(nn.Module):
     def __init__(self,
-                 run_size = 20,
-                 incoming_run_size = 45,
-                 run_hidden_size = 128,
-                 incoming_run_hidden_size = 128,
-                 num_layers = 1,
-                 dropout = 0.2,
+                 run_size=20,
+                 incoming_run_size=45,
+                 run_hidden_size=128,
+                 incoming_run_hidden_size=128,
+                 num_layers=1,
+                 dropout=0.2,
                  ff_hidden_sizes=None,
                  ff_output_size=49):
         super().__init__()
@@ -70,7 +68,7 @@ class DualLSTMModel2(nn.Module):
             prev_hidden_size = hidden_size
 
         ff_layers.append(nn.Linear(prev_hidden_size, ff_output_size))
-        self.fead_forward = nn.Sequential(*ff_layers)
+        self.feed_forward = nn.Sequential(*ff_layers)
 
     def forward(self, x1, x2, lengths1, lengths2):
         if lengths1 is not None:
@@ -105,10 +103,10 @@ class DualLSTMModel2(nn.Module):
             lstm2_out, (h2_n, c2_n) = self.lstm_incoming_run(x2)
             out_incoming_run = lstm2_out.mean(dim=1)
 
-        return self.fead_forward(torch.concat([out_run, out_incoming_run], dim=1))
+        return self.feed_forward(torch.concat([out_run, out_incoming_run], dim=1))
     
 
-    # Model summary
+# Model summary
 from torchinfo import summary
 
 model = DualLSTMModel2()
@@ -116,10 +114,10 @@ model = DualLSTMModel2()
 summary(
     model,
     input_data=(
-        torch.randn(32, 755, 20),  # x1: batch_size=8, seq_len=10, feature_dim=20
-        torch.randn(32, 755, 45),  # x2
-        torch.full((32,), 700),    # lengths1
-        torch.full((32,), 700)     # lengths2
+        torch.randn(32, 755, 20),  # x1: batch_size=32, seq_len=755, feature_dim=20
+        torch.randn(32, 755, 45),  # x2: batch_size=32, seq_len=755, feature_dim=45
+        torch.full((32,), 700),  # lengths1
+        torch.full((32,), 700)  # lengths2
     )
 )
 
@@ -142,9 +140,25 @@ baseline_2_model = DualLSTMModel2(
     ff_hidden_sizes=[256, 128]
 )
 
-train_loader, val_loader, test_loader = create_data_loaders(X_run, X_incoming_run, y, train_ratio=0.7, val_ratio=0.1, batch_size=BATCH_SIZE, standardize=True, random_state=RANDOM_STATE)
+train_loader, val_loader, test_loader = create_data_loaders(
+    X_run, X_incoming_run, y,
+    train_ratio=0.7,
+    val_ratio=0.1,
+    batch_size=BATCH_SIZE,
+    standardize=True,
+    random_state=RANDOM_STATE
+)
 
-train_losses, val_losses = train_model(baseline_2_model, train_loader, val_loader, num_epochs=NUM_EPOCHS, learning_rate=LEARNING_RATE, patience=PATIENCE, min_delta=MIN_DELTA, model_save_path='baseline-2-best-model.pth')
+train_losses, val_losses = train_model(
+    baseline_2_model,
+    train_loader,
+    val_loader,
+    num_epochs=NUM_EPOCHS,
+    learning_rate=LEARNING_RATE,
+    patience=PATIENCE,
+    min_delta=MIN_DELTA,
+    model_save_path='baseline-2-best-model.pth'
+)
 
 test_results = test_model(baseline_2_model, test_loader)
 
