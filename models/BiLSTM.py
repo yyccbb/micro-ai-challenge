@@ -125,7 +125,7 @@ summary(
 )
 
 # Load data
-directory_path = os.path.dirname(os.path.abspath(__file__))
+directory_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
 incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
