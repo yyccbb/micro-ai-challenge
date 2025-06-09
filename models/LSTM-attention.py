@@ -8,9 +8,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from joblib import load
+from torchinfo import summary
 from tqdm import tqdm
 
 from utils import create_data_loaders, train_model, test_model
+
 
 RANDOM_STATE = 42
 BATCH_SIZE = 32
@@ -169,24 +171,8 @@ class BidirectionalDualLSTMWithAttention(nn.Module):
         # Returns None if the attribute does not exist
         return getattr(self, 'last_attention_weights', None)
 
-
-# Model summary
-from torchinfo import summary
-
-model = BidirectionalDualLSTMWithAttention()
-
-summary(
-    model,
-    input_data=(
-        torch.randn(32, 755, 20),  # x1: batch_size=32, seq_len=755, feature_dim=20
-        torch.randn(32, 755, 45),  # x2: batch_size=32, seq_len=755, feature_dim=45
-        torch.full((32,), 700),  # lengths1
-        torch.full((32,), 700)  # lengths2
-    )
-)
-
 # Load data
-directory_path = os.path.dirname(os.path.abspath(__file__))
+directory_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
 incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
@@ -205,6 +191,16 @@ attention_model = BidirectionalDualLSTMWithAttention(
     dropout=0.2,
     attention_size=ATTENTION_SIZE,
     ff_hidden_sizes=FF_HIDDEN_SIZE
+)
+
+summary(
+    attention_model,
+    input_data=(
+        torch.randn(32, 755, 20),  # x1: batch_size=32, seq_len=755, feature_dim=20
+        torch.randn(32, 755, 45),  # x2: batch_size=32, seq_len=755, feature_dim=45
+        torch.full((32,), 700),  # lengths1
+        torch.full((32,), 700)  # lengths2
+    )
 )
 
 # Create data loaders
