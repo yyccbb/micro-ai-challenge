@@ -2,18 +2,18 @@ import torch
 import torch.nn as nn
 import math
 
+from torchinfo import summary
 
 class TemporalEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=1000):
+    def __init__(self, d_model, max_len=1000, dropout=0.2):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
         self.d_model = d_model
 
         # Learnable embedding for each timestamp position
-        # More efficient than linear projection for integer timestamps
         self.time_embedding = nn.Embedding(max_len, d_model)
 
-        # Alternative: simple linear projection (uncomment if preferred)
+        # Alternative
         # self.time_projection = nn.Linear(1, d_model)
 
     def forward(self, x, timestamps):
@@ -22,27 +22,45 @@ class TemporalEncoding(nn.Module):
             x: Input embeddings (batch, seq_len, d_model)
             timestamps: Actual timestamps (batch, seq_len) - seconds since start
         """
-        # Since timestamps are integers (0, 1, 2, ...), use them directly
         time_emb = self.time_embedding(timestamps.long())
 
-        # Alternative with linear projection:
+        # Alternative
         # time_emb = self.time_projection(timestamps.unsqueeze(-1) / 100.0)  # Normalize
 
-        # Add temporal encoding to input
         x = x + time_emb
+        x = self.dropout(x)
+        return x
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=800, dropout=0.2):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() *
+                             (-math.log(10000.0) / d_model))
+
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
 
-
-class WaferTransformer(nn.Module):
+class FullTransformer(nn.Module):
     def __init__(self,
                  incoming_feature_size=45,
                  run_feature_size=20,
-                 d_model=256,
-                 nhead=8,
-                 num_encoder_layers=4,
-                 num_decoder_layers=4,
-                 dim_feedforward=1024,
-                 dropout=0.2,
+                 d_model=128,
+                 nhead=4,
+                 num_encoder_layers=2,
+                 num_decoder_layers=2,
+                 dim_feedforward=512,
+                 dropout=0.3,
                  output_size=49,
                  aggregation='mean',
                  use_temporal_encoding=True):
@@ -52,22 +70,13 @@ class WaferTransformer(nn.Module):
         self.aggregation = aggregation
         self.use_temporal_encoding = use_temporal_encoding
 
-        # Input projections (excluding timestamp features if we use them separately)
-        # We'll process timestamps separately, so reduce feature size by 2
-        # (removing indices 3 and 4: Run Start Time and Time Stamp)
-        if use_temporal_encoding:
-            self.incoming_projection = nn.Linear(incoming_feature_size - 2, d_model)
-            self.run_projection = nn.Linear(run_feature_size - 2, d_model)
-        else:
-            self.incoming_projection = nn.Linear(incoming_feature_size, d_model)
-            self.run_projection = nn.Linear(run_feature_size, d_model)
+        self.incoming_projection = nn.Linear(incoming_feature_size, d_model)
+        self.run_projection = nn.Linear(run_feature_size, d_model)
 
-        # Temporal encoding using actual timestamps
         if use_temporal_encoding:
-            self.temporal_encoder = TemporalEncoding(d_model, dropout=dropout)
+            self.temporal_encoder = TemporalEncoding(d_model, max_len=800, dropout=dropout)
         else:
-            # Fallback to standard positional encoding
-            self.pos_encoder = PositionalEncoding(d_model, max_len=1000, dropout=dropout)
+            self.pos_encoder = PositionalEncoding(d_model, max_len=800, dropout=dropout)
 
         # Transformer
         self.transformer = nn.Transformer(
@@ -89,15 +98,10 @@ class WaferTransformer(nn.Module):
         )
 
     def extract_timestamps(self, data):
-        """
-        Extract timestamp information from the data.
-        Timestamp = data[:, :, 4] - data[:, :, 3]  (Time Stamp - Run Start Time)
-        """
-        timestamps = data[:, :, 4] - data[:, :, 3]  # Seconds since start
+        timestamps = data[:, :, 4] - data[:, :, 3]  # (Time Stamp - Run Start Time)
         return timestamps
 
     def create_padding_mask(self, lengths, max_len, device):
-        """Create padding mask from lengths"""
         batch_size = lengths.shape[0]
         # Create mask where True indicates positions to ignore (padding)
         mask = torch.arange(max_len, device=device).expand(
@@ -114,34 +118,15 @@ class WaferTransformer(nn.Module):
             incoming_timestamps = self.extract_timestamps(incoming_data)
             run_timestamps = self.extract_timestamps(run_data)
 
-            # Remove the timestamp features from the data
-            # Keep all features except the time-related ones we'll encode separately
-            incoming_features = torch.cat([
-                incoming_data[:, :, :3],  # Features before Run Start Time
-                incoming_data[:, :, 5:]  # Features after Time Stamp
-            ], dim=-1)
-
-            run_features = torch.cat([
-                run_data[:, :, :3],  # Features before Run Start Time
-                run_data[:, :, 5:]  # Features after Time Stamp
-            ], dim=-1)
-
-            # Project inputs to d_model dimension
-            incoming_emb = self.incoming_projection(incoming_features)
-            run_emb = self.run_projection(run_features)
-
-            # Transpose for transformer (seq_len, batch, d_model)
-            incoming_emb = incoming_emb.transpose(0, 1)
-            run_emb = run_emb.transpose(0, 1)
+            # Project ALL features to d_model dimension
+            incoming_emb = self.incoming_projection(incoming_data)
+            run_emb = self.run_projection(run_data)
 
             # Add temporal encoding using actual timestamps
-            incoming_emb = incoming_emb.transpose(0, 1)  # Back to (batch, seq, d_model)
-            run_emb = run_emb.transpose(0, 1)
-
             incoming_emb = self.temporal_encoder(incoming_emb, incoming_timestamps)
             run_emb = self.temporal_encoder(run_emb, run_timestamps)
 
-            # Transpose back for transformer
+            # Transpose for transformer (seq_len, batch, d_model)
             incoming_emb = incoming_emb.transpose(0, 1)
             run_emb = run_emb.transpose(0, 1)
         else:
@@ -164,7 +149,6 @@ class WaferTransformer(nn.Module):
         )
         memory_key_padding_mask = src_key_padding_mask
 
-        # Pass through transformer
         output = self.transformer(
             src=incoming_emb,
             tgt=run_emb,
@@ -207,33 +191,11 @@ class WaferTransformer(nn.Module):
         return output
 
 
-class PositionalEncoding(nn.Module):
-    """Standard positional encoding as fallback"""
-
-    def __init__(self, d_model, max_len=5000, dropout=0.1):
-        super().__init__()
-        self.dropout = nn.Dropout(dropout)
-
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() *
-                             (-math.log(10000.0) / d_model))
-
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
-        return self.dropout(x)
 
 
-# Integration with your existing code
-def create_transformer_model():
-    """Create transformer model with optimal settings for wafer data"""
-    model = WaferTransformer(
+if __name__ == "__main__":
+    # Test the model
+    model = FullTransformer(
         incoming_feature_size=45,
         run_feature_size=20,
         d_model=128,  # Reduced from 256 - more appropriate for input size
@@ -246,12 +208,6 @@ def create_transformer_model():
         aggregation='mean',
         use_temporal_encoding=True
     )
-    return model
-
-
-if __name__ == "__main__":
-    # Test the model
-    model = create_transformer_model()
 
     # Test forward pass
     batch_size = 4
@@ -275,21 +231,11 @@ if __name__ == "__main__":
     run_lengths = torch.randint(100, 700, (batch_size,))
 
     output = model(incoming, run, incoming_lengths, run_lengths)
-    print(f"Output shape: {output.shape}")  # Should be (4, 49)
 
-    # Print model info
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Total parameters: {total_params:,}")
-    print(f"Trainable parameters: {trainable_params:,}")
+    # Use torchinfo with your multi-input setup
+    summary(model,
+            input_data=(incoming, run, incoming_lengths, run_lengths),
+            col_names=["input_size", "output_size", "num_params", "trainable"],
+            row_settings=["var_names"],
+            verbose=1)
 
-    # Compare with baseline LSTM model size
-    print(f"\nFor comparison, your DualLSTMModel2 likely has ~500K-1M parameters")
-    print(f"This transformer has {total_params:,} parameters")
-
-    # Alternative configurations to try:
-    print("\nAlternative configurations to experiment with:")
-    print("1. Tiny: d_model=64, nhead=4, layers=2, feedforward=256")
-    print("2. Small: d_model=128, nhead=4, layers=2, feedforward=512 (current)")
-    print("3. Medium: d_model=192, nhead=6, layers=3, feedforward=768")
-    print("4. Large: d_model=256, nhead=8, layers=3, feedforward=1024")
