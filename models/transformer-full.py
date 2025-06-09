@@ -1,8 +1,25 @@
+import os
 import torch
 import torch.nn as nn
 import math
 
+from joblib import load
 from torchinfo import summary
+
+from utils import create_data_loaders, train_model, test_model
+
+RANDOM_STATE = 42
+BATCH_SIZE = 32
+NUM_EPOCHS = 100
+LEARNING_RATE = 1e-3
+PATIENCE = 20
+MIN_DELTA = 1e-4
+
+N_ENCODER_DECODER_LAYERS = 2
+D_MODEL = 128
+N_HEAD = 4
+AGGREGATION = 'mean' # mean, max, last, first
+USE_TEMPORAL_ENCODING = True
 
 class TemporalEncoding(nn.Module):
     def __init__(self, d_model, max_len=1000, dropout=0.2):
@@ -194,19 +211,18 @@ class FullTransformer(nn.Module):
 
 
 if __name__ == "__main__":
-    # Test the model
     model = FullTransformer(
         incoming_feature_size=45,
         run_feature_size=20,
-        d_model=128,  # Reduced from 256 - more appropriate for input size
-        nhead=4,  # Reduced from 8 - each head gets 32 dimensions
-        num_encoder_layers=2,  # Reduced from 3 - helps prevent overfitting
-        num_decoder_layers=2,  # Reduced from 3
-        dim_feedforward=512,  # Reduced from 1024 - still 4x d_model
-        dropout=0.3,  # Increased from 0.2 for more regularization
+        d_model=D_MODEL,
+        nhead=N_HEAD,
+        num_encoder_layers=N_ENCODER_DECODER_LAYERS,
+        num_decoder_layers=N_ENCODER_DECODER_LAYERS,
+        dim_feedforward=4 * D_MODEL,
+        dropout=0.2,
         output_size=49,
-        aggregation='mean',
-        use_temporal_encoding=True
+        aggregation=AGGREGATION,
+        use_temporal_encoding=USE_TEMPORAL_ENCODING
     )
 
     # Test forward pass
@@ -217,12 +233,10 @@ if __name__ == "__main__":
     incoming = torch.randn(batch_size, seq_len, 45)
     run = torch.randn(batch_size, seq_len, 20)
 
-    # Set up timestamps (features 3 and 4)
     # Run Start Time (constant per sample)
     incoming[:, :, 3] = 1000.0
     run[:, :, 3] = 1000.0
 
-    # Time Stamp (incrementing by 1 second each step)
     for i in range(batch_size):
         incoming[i, :, 4] = 1000.0 + torch.arange(seq_len)
         run[i, :, 4] = 1000.0 + torch.arange(seq_len)
@@ -230,12 +244,47 @@ if __name__ == "__main__":
     incoming_lengths = torch.randint(100, 700, (batch_size,))
     run_lengths = torch.randint(100, 700, (batch_size,))
 
-    output = model(incoming, run, incoming_lengths, run_lengths)
-
-    # Use torchinfo with your multi-input setup
     summary(model,
             input_data=(incoming, run, incoming_lengths, run_lengths),
             col_names=["input_size", "output_size", "num_params", "trainable"],
             row_settings=["var_names"],
             verbose=1)
 
+    # Load data
+    directory_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
+    incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
+    metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix.joblib'))
+
+    X_run = torch.from_numpy(run_matrices).float()
+    X_incoming_run = torch.from_numpy(incoming_run_matrices).float()
+    y = torch.from_numpy(metrology_matrix).float()
+    print(X_run.shape, X_incoming_run.shape, y.shape)
+
+    # Create data loaders
+    train_loader, val_loader, test_loader = create_data_loaders(
+        X_run, X_incoming_run, y,
+        train_ratio=0.7,
+        val_ratio=0.1,
+        batch_size=BATCH_SIZE,
+        standardize=True,
+        random_state=RANDOM_STATE
+    )
+
+    # Train the model
+    train_losses, val_losses = train_model(
+        model,
+        train_loader,
+        val_loader,
+        num_epochs=NUM_EPOCHS,
+        learning_rate=LEARNING_RATE,
+        patience=PATIENCE,
+        min_delta=MIN_DELTA,
+        model_save_path='transformer-full-best-model.pth'
+    )
+
+    # Test the model
+    test_results = test_model(model, test_loader)
+
+    print({k: test_results[k] for k in ['test_loss', 'mse', 'mae', 'r2_score']})
