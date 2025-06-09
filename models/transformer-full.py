@@ -115,7 +115,7 @@ class FullTransformer(nn.Module):
         )
 
     def extract_timestamps(self, data):
-        timestamps = data[:, :, 4] - data[:, :, 3]  # (Time Stamp - Run Start Time)
+        timestamps = data[:, :, 3] - data[:, :, 2]  # (Time Stamp - Run Start Time)
         return timestamps
 
     def create_padding_mask(self, lengths, max_len, device):
@@ -234,12 +234,12 @@ if __name__ == "__main__":
     run = torch.randn(batch_size, seq_len, 20)
 
     # Run Start Time (constant per sample)
-    incoming[:, :, 3] = 1000.0
-    run[:, :, 3] = 1000.0
+    incoming[:, :, 2] = 1000.0
+    run[:, :, 2] = 1000.0
 
     for i in range(batch_size):
-        incoming[i, :, 4] = 1000.0 + torch.arange(seq_len)
-        run[i, :, 4] = 1000.0 + torch.arange(seq_len)
+        incoming[i, :, 3] = 1000.0 + torch.arange(seq_len)
+        run[i, :, 3] = 1000.0 + torch.arange(seq_len)
 
     incoming_lengths = torch.randint(100, 700, (batch_size,))
     run_lengths = torch.randint(100, 700, (batch_size,))
