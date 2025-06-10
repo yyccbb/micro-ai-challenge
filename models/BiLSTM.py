@@ -127,9 +127,9 @@ summary(
 # Load data
 directory_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices-onehot.joblib'))
-incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices-onehot.joblib'))
-metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix-onehot.joblib'))
+run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices_onehot.joblib'))
+incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices_onehot.joblib'))
+metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix_onehot.joblib'))
 
 X_run = torch.from_numpy(run_matrices).float()
 X_incoming_run = torch.from_numpy(incoming_run_matrices).float()
