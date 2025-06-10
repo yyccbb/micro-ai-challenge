@@ -21,8 +21,8 @@ MIN_DELTA = 1e-4
 
 class BidirectionalDualLSTMModel(nn.Module):
     def __init__(self,
-                 run_size=20,
-                 incoming_run_size=45,
+                 run_size=38,
+                 incoming_run_size=63,
                  run_hidden_size=128,
                  incoming_run_hidden_size=128,
                  num_layers=1,
@@ -117,8 +117,8 @@ model = BidirectionalDualLSTMModel()
 summary(
     model,
     input_data=(
-        torch.randn(32, 755, 20),  # x1: batch_size=32, seq_len=755, feature_dim=20
-        torch.randn(32, 755, 45),  # x2: batch_size=32, seq_len=755, feature_dim=45
+        torch.randn(32, 755, 38),  # x1: batch_size=32, seq_len=755, feature_dim=20
+        torch.randn(32, 755, 63),  # x2: batch_size=32, seq_len=755, feature_dim=45
         torch.full((32,), 700),  # lengths1
         torch.full((32,), 700)  # lengths2
     )
@@ -127,9 +127,9 @@ summary(
 # Load data
 directory_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
-incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
-metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix.joblib'))
+run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices-onehot.joblib'))
+incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices-onehot.joblib'))
+metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix-onehot.joblib'))
 
 X_run = torch.from_numpy(run_matrices).float()
 X_incoming_run = torch.from_numpy(incoming_run_matrices).float()
