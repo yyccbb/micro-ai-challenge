@@ -18,7 +18,6 @@ LEARNING_RATE = 1e-3
 PATIENCE = 20
 MIN_DELTA = 1e-4
 
-
 class BidirectionalDualLSTMModel(nn.Module):
     def __init__(self,
                  run_size=20,
@@ -26,7 +25,8 @@ class BidirectionalDualLSTMModel(nn.Module):
                  run_hidden_size=128,
                  incoming_run_hidden_size=128,
                  num_layers=1,
-                 dropout=0.2,
+                 lstm_dropout=0.5,
+                 ff_dropout=0.2,
                  ff_hidden_sizes=None,
                  ff_output_size=49):
         super().__init__()
@@ -43,7 +43,7 @@ class BidirectionalDualLSTMModel(nn.Module):
             input_size=run_size,
             hidden_size=run_hidden_size,
             num_layers=num_layers,
-            dropout=dropout if num_layers > 1 else 0,
+            dropout=lstm_dropout if num_layers > 1 else 0,
             batch_first=True,
             bidirectional=True  # Added bidirectional
         )
@@ -53,7 +53,7 @@ class BidirectionalDualLSTMModel(nn.Module):
             input_size=incoming_run_size,
             hidden_size=incoming_run_hidden_size,
             num_layers=num_layers,
-            dropout=dropout if num_layers > 1 else 0,
+            dropout=lstm_dropout if num_layers > 1 else 0,
             batch_first=True,
             bidirectional=True  # Added bidirectional
         )
@@ -68,7 +68,7 @@ class BidirectionalDualLSTMModel(nn.Module):
             ff_layers.extend([
                 nn.Linear(prev_hidden_size, hidden_size),
                 nn.ReLU(),
-                nn.Dropout(dropout)
+                nn.Dropout(ff_dropout)
             ])
             prev_hidden_size = hidden_size
 
@@ -141,7 +141,8 @@ bidirectional_model = BidirectionalDualLSTMModel(
     run_hidden_size=128,
     incoming_run_hidden_size=128,
     num_layers=1,
-    dropout=0.2,
+    lstm_dropout=0.5,
+    ff_dropout=0.2,
     ff_hidden_sizes=[256, 128]
 )
 
