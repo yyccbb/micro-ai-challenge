@@ -20,6 +20,8 @@ D_MODEL = 128
 N_HEAD = 4
 AGGREGATION = 'mean' # mean, max, last, first
 USE_TEMPORAL_ENCODING = True
+TRANSFORMER_DROPOUT = 0.1
+COMMON_DROPOUT = 0.2
 
 class TemporalEncoding(nn.Module):
     def __init__(self, d_model, max_len=1000, dropout=0.2):
@@ -70,14 +72,15 @@ class PositionalEncoding(nn.Module):
 
 class FullTransformer(nn.Module):
     def __init__(self,
-                 incoming_feature_size=45,
                  run_feature_size=20,
+                 incoming_feature_size=45,
                  d_model=128,
                  nhead=4,
                  num_encoder_layers=2,
                  num_decoder_layers=2,
                  dim_feedforward=512,
-                 dropout=0.3,
+                 transformer_dropout=0.1,
+                 common_dropout=0.2,
                  output_size=49,
                  aggregation='mean',
                  use_temporal_encoding=True):
@@ -87,13 +90,13 @@ class FullTransformer(nn.Module):
         self.aggregation = aggregation
         self.use_temporal_encoding = use_temporal_encoding
 
-        self.incoming_projection = nn.Linear(incoming_feature_size, d_model)
         self.run_projection = nn.Linear(run_feature_size, d_model)
+        self.incoming_projection = nn.Linear(incoming_feature_size, d_model)
 
         if use_temporal_encoding:
-            self.temporal_encoder = TemporalEncoding(d_model, max_len=800, dropout=dropout)
+            self.temporal_encoder = TemporalEncoding(d_model, max_len=800, dropout=common_dropout)
         else:
-            self.pos_encoder = PositionalEncoding(d_model, max_len=800, dropout=dropout)
+            self.pos_encoder = PositionalEncoding(d_model, max_len=800, dropout=common_dropout)
 
         # Transformer
         self.transformer = nn.Transformer(
@@ -102,7 +105,7 @@ class FullTransformer(nn.Module):
             num_encoder_layers=num_encoder_layers,
             num_decoder_layers=num_decoder_layers,
             dim_feedforward=dim_feedforward,
-            dropout=dropout,
+            dropout=transformer_dropout,
             batch_first=False  # PyTorch transformer expects (seq_len, batch, features)
         )
 
@@ -110,7 +113,7 @@ class FullTransformer(nn.Module):
         self.output_projection = nn.Sequential(
             nn.Linear(d_model, d_model // 2),
             nn.ReLU(),
-            nn.Dropout(dropout),
+            nn.Dropout(common_dropout),
             nn.Linear(d_model // 2, output_size)
         )
 
@@ -126,36 +129,36 @@ class FullTransformer(nn.Module):
         ) >= lengths.unsqueeze(1)
         return mask
 
-    def forward(self, incoming_data, run_data, incoming_lengths, run_lengths):
-        batch_size = incoming_data.size(0)
+    def forward(self, run_data, incoming_data, run_lengths, incoming_lengths):
+        batch_size = run_data.size(0)
         device = incoming_data.device
 
         if self.use_temporal_encoding:
             # Extract timestamps before projecting features
-            incoming_timestamps = self.extract_timestamps(incoming_data)
             run_timestamps = self.extract_timestamps(run_data)
+            incoming_timestamps = self.extract_timestamps(incoming_data)
 
             # Project ALL features to d_model dimension
-            incoming_emb = self.incoming_projection(incoming_data)
             run_emb = self.run_projection(run_data)
+            incoming_emb = self.incoming_projection(incoming_data)
 
             # Add temporal encoding using actual timestamps
-            incoming_emb = self.temporal_encoder(incoming_emb, incoming_timestamps)
             run_emb = self.temporal_encoder(run_emb, run_timestamps)
+            incoming_emb = self.temporal_encoder(incoming_emb, incoming_timestamps)
 
             # Transpose for transformer (seq_len, batch, d_model)
-            incoming_emb = incoming_emb.transpose(0, 1)
             run_emb = run_emb.transpose(0, 1)
+            incoming_emb = incoming_emb.transpose(0, 1)
         else:
             # Standard approach without temporal encoding
-            incoming_emb = self.incoming_projection(incoming_data)
             run_emb = self.run_projection(run_data)
+            incoming_emb = self.incoming_projection(incoming_data)
 
-            incoming_emb = incoming_emb.transpose(0, 1)
             run_emb = run_emb.transpose(0, 1)
+            incoming_emb = incoming_emb.transpose(0, 1)
 
-            incoming_emb = self.pos_encoder(incoming_emb)
             run_emb = self.pos_encoder(run_emb)
+            incoming_emb = self.pos_encoder(incoming_emb)
 
         # Create padding masks
         src_key_padding_mask = self.create_padding_mask(
@@ -212,14 +215,15 @@ class FullTransformer(nn.Module):
 
 if __name__ == "__main__":
     model = FullTransformer(
-        incoming_feature_size=45,
         run_feature_size=20,
+        incoming_feature_size=45,
         d_model=D_MODEL,
         nhead=N_HEAD,
         num_encoder_layers=N_ENCODER_DECODER_LAYERS,
         num_decoder_layers=N_ENCODER_DECODER_LAYERS,
         dim_feedforward=4 * D_MODEL,
-        dropout=0.2,
+        transformer_dropout=TRANSFORMER_DROPOUT,
+        common_dropout=COMMON_DROPOUT,
         output_size=49,
         aggregation=AGGREGATION,
         use_temporal_encoding=USE_TEMPORAL_ENCODING
@@ -245,7 +249,7 @@ if __name__ == "__main__":
     run_lengths = torch.randint(100, 700, (batch_size,))
 
     summary(model,
-            input_data=(incoming, run, incoming_lengths, run_lengths),
+            input_data=(run, incoming, run_lengths, incoming_lengths),
             col_names=["input_size", "output_size", "num_params", "trainable"],
             row_settings=["var_names"],
             verbose=1)
