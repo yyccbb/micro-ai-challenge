@@ -1,3 +1,5 @@
+import os
+from joblib import dump, load
 import torch
 import torch.nn as nn
 from math import sqrt
@@ -263,108 +265,153 @@ def test_model(model, test_loader, device='cuda' if torch.cuda.is_available() el
 
     return results
 
-def train_full_model_and_predict(
+
+def train_and_predict_with_validation(
         model,
         x1, x2, y,
         test_x1, test_x2,
-        num_epochs=40,
+        num_epochs=100,  # Increased default for early stopping
         learning_rate=1e-3,
         batch_size=32,
         device='cuda' if torch.cuda.is_available() else 'cpu',
         padding_value=0.0,
         num_workers=0,
-        random_state=42
+        random_state=42,
+        weight_decay=1e-2,
+        # --- Early stopping and Scheduler parameters ---
+        patience=10,
+        min_delta=1e-4,
+        model_save_path="best_model_val.pth"
 ):
     """
-    Trains a model on the full training data and generates predictions for the test data.
+    Splits data into train/val, trains with early stopping, and predicts on a test set.
 
-    This function follows the final training protocol:
-    1. Standardizes the features (x1, x2) using statistics computed from the entire training set.
-    2. Trains the model on the full, standardized training data for a fixed number of epochs.
-    3. Standardizes the test features (test_x1, test_x2) using the same statistics from the training set.
-    4. Generates and returns predictions for the standardized test set.
+    This function now:
+    1. Splits the provided data (x1, x2, y) into a 90% training and 10% validation set.
+    2. Computes standardization stats ONLY from the 90% training portion.
+    3. Applies this standardization to the train, validation, and final test sets.
+    4. Trains the model using the train set, while monitoring loss on the validation set
+       for early stopping and for a ReduceLROnPlateau learning rate scheduler.
+    5. Saves the best performing model weights based on validation loss.
+    6. Loads the best model and uses it to predict on the separate test_x1, test_x2.
 
     Args:
-        model (nn.Module): The model to be trained.
-        x1 (torch.Tensor): The first feature tensor of the entire training set.
-        x2 (torch.Tensor): The second feature tensor of the entire training set.
-        y (torch.Tensor): The target tensor for the entire training set.
-        test_x1 (torch.Tensor): The first feature tensor of the test set.
-        test_x2 (torch.Tensor): The second feature tensor of the test set.
-        num_epochs (int): The fixed number of epochs to train for.
-        learning_rate (float): The learning rate for the optimizer.
-        batch_size (int): The batch size for DataLoaders.
-        device (str): The device to run the training and prediction on ('cuda' or 'cpu').
-        padding_value (float): The value used for padding sequences.
-        num_workers (int): Number of workers for the DataLoader.
-        random_state (int): Random seed for shuffling the training data.
+        ... (previous args) ...
+        patience (int): How many epochs to wait for improvement before stopping.
+        min_delta (float): Minimum change in val_loss to be considered an improvement.
+        scheduler_patience (int): Patience for the ReduceLROnPlateau scheduler.
+        scheduler_factor (float): Factor by which the LR is reduced by the scheduler.
+        model_save_path (str): Path to save the temporary best model weights.
 
     Returns:
         torch.Tensor: The predictions for the test set.
     """
-    print("--- Starting Final Model Training and Prediction ---")
+    print("--- Starting Training with Validation Split and Prediction ---")
     model.to(device)
 
-    # 1. Standardize the full training data
-    print("Step 1: Computing standardization stats from the full training data...")
+    # 1. Split data into 90% training and 10% validation
+    print("Step 1: Splitting data into 90% train and 10% validation sets...")
+    total_size = len(x1)
+    indices = torch.randperm(total_size, generator=torch.Generator().manual_seed(random_state))
+    val_size = int(0.1 * total_size)
+
+    val_indices = indices[:val_size]
+    train_indices = indices[val_size:]
+
     lengths1 = get_sequence_lengths(x1, padding_value)
     lengths2 = get_sequence_lengths(x2, padding_value)
+
+    x1_train = x1[train_indices]
+    x2_train = x2[train_indices]
+
+    lengths1_train = get_sequence_lengths(x1_train, padding_value)
+    lengths2_train = get_sequence_lengths(x2_train, padding_value)
+
+    mask1_train = create_mask_from_lengths(lengths1_train, x1_train.size(1))
+    mask2_train = create_mask_from_lengths(lengths2_train, x2_train.size(1))
+
+    x1_mean, x1_std = compute_standardization_stats(x1_train, mask1_train, dim=(0, 1))
+    x2_mean, x2_std = compute_standardization_stats(x2_train, mask2_train, dim=(0, 1))
+
     mask1 = create_mask_from_lengths(lengths1, x1.size(1))
     mask2 = create_mask_from_lengths(lengths2, x2.size(1))
 
-    x1_mean, x1_std = compute_standardization_stats(x1, mask1, dim=(0, 1))
-    x2_mean, x2_std = compute_standardization_stats(x2, mask2, dim=(0, 1))
+    x1 = standardize_data(x1, x1_mean, x1_std, mask1, padding_value)
+    x2 = standardize_data(x2, x2_mean, x2_std, mask2, padding_value)
 
-    x1_standardized = standardize_data(x1, x1_mean, x1_std, mask1, padding_value)
-    x2_standardized = standardize_data(x2, x2_mean, x2_std, mask2, padding_value)
-    print("Standardization complete.")
+    dataset = TimeSeriesDataset(x1, x2, y, lengths1, lengths2, padding_value)
 
-    # 2. Create DataLoader for the full training data
-    full_train_dataset = TimeSeriesDataset(x1_standardized, x2_standardized, y, lengths1, lengths2, padding_value)
+    train_dataset = torch.utils.data.Subset(dataset, train_indices)
+    val_dataset = torch.utils.data.Subset(dataset, val_indices)
 
     loader_kwargs = dict(batch_size=batch_size, num_workers=num_workers, pin_memory=True)
-    # Shuffle is True for the final training run
-    full_train_loader = torch.utils.data.DataLoader(full_train_dataset, shuffle=True, **loader_kwargs,
-                                                    generator=torch.Generator().manual_seed(random_state))
 
-    # 3. Train the model for a fixed number of epochs
-    print(f"\nStep 2: Training model on full dataset for {num_epochs} epochs...")
-    criterion = nn.MSELoss()
+    train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **loader_kwargs)
+    val_loader = torch.utils.data.DataLoader(val_dataset, shuffle=False, **loader_kwargs)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=5
+    )
+    print(f"Using Adam optimizer and ReduceLROnPlateau scheduler.")
+
+    # 5. Train the model with early stopping
+    print(f"\nStep 3: Training model with validation for up to {num_epochs} epochs...")
+    criterion = nn.MSELoss()
+    best_val_loss = float('inf')
+    patience_counter = 0
 
     for epoch in range(num_epochs):
-        train_loss = train_epoch(model, full_train_loader, criterion, optimizer, device)
-        print(f"Epoch {epoch + 1}/{num_epochs} | Train Loss: {train_loss:.6f}")
-    print("Final training complete.")
+        train_loss = train_epoch(model, train_loader, criterion, optimizer, device)
+        val_loss = validate_epoch(model, val_loader, criterion, device)
+        scheduler.step(val_loss)
 
-    # 4. Standardize the test data using the *training* stats
-    print("\nStep 3: Standardizing test data using training set statistics...")
+        current_lr = optimizer.param_groups[0]['lr']
+        print(
+            f"Epoch {epoch + 1}/{num_epochs} | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f} | LR: {current_lr:.2e}")
+
+
+        if val_loss < best_val_loss - min_delta:
+            best_val_loss = val_loss
+            patience_counter = 0
+            torch.save(model.state_dict(), model_save_path)
+            print(f"Validation loss improved to {best_val_loss:.6f}. Saving model to {model_save_path}")
+        else:
+            patience_counter += 1
+
+        if patience_counter >= patience:
+            print(f"Early stopping triggered after {patience} epochs with no improvement.")
+            break
+
+    print("Training complete.")
+
+    # 6. Load best model and predict on the final test set
+    print(f"\nStep 4: Loading best model from {model_save_path} and generating predictions...")
+    if not os.path.exists(model_save_path):
+        print(
+            "Warning: No model was saved. This may happen if training was too short or no improvement was found. Using the model from the last epoch.")
+    else:
+        model.load_state_dict(torch.load(model_save_path))
+
+    # Standardize the final test data using the stats from the training split
     test_lengths1 = get_sequence_lengths(test_x1, padding_value)
     test_lengths2 = get_sequence_lengths(test_x2, padding_value)
     test_mask1 = create_mask_from_lengths(test_lengths1, test_x1.size(1))
     test_mask2 = create_mask_from_lengths(test_lengths2, test_x2.size(1))
+    test_x1_std = standardize_data(test_x1, x1_mean, x1_std, test_mask1, padding_value)
+    test_x2_std = standardize_data(test_x2, x2_mean, x2_std, test_mask2, padding_value)
 
-    test_x1_standardized = standardize_data(test_x1, x1_mean, x1_std, test_mask1, padding_value)
-    test_x2_standardized = standardize_data(test_x2, x2_mean, x2_std, test_mask2, padding_value)
-
-    # 5. Generate predictions on the full test matrix
-    print("\nStep 4: Generating predictions on the test set...")
     model.eval()
     pred_y = None
     with torch.no_grad():
-        # Move all required tensors to the correct device
-        test_x1_dev = test_x1_standardized.to(device)
-        test_x2_dev = test_x2_standardized.to(device)
+        test_x1_dev = test_x1_std.to(device)
+        test_x2_dev = test_x2_std.to(device)
         test_lengths1_dev = test_lengths1.to(device)
         test_lengths2_dev = test_lengths2.to(device)
-
-        # Run the entire test set through the model in one pass
         pred_y = model(test_x1_dev, test_x2_dev, test_lengths1_dev, test_lengths2_dev)
-
-        # Move final predictions to CPU
         pred_y = pred_y.cpu()
 
+    dump(pred_y, 'predicted_y.joblib')
     print("Prediction generation complete.")
     print("--- Process Finished ---")
-
     return pred_y
