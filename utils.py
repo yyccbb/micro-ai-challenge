@@ -262,3 +262,109 @@ def test_model(model, test_loader, device='cuda' if torch.cuda.is_available() el
     })
 
     return results
+
+def train_full_model_and_predict(
+        model,
+        x1, x2, y,
+        test_x1, test_x2,
+        num_epochs=40,
+        learning_rate=1e-3,
+        batch_size=32,
+        device='cuda' if torch.cuda.is_available() else 'cpu',
+        padding_value=0.0,
+        num_workers=0,
+        random_state=42
+):
+    """
+    Trains a model on the full training data and generates predictions for the test data.
+
+    This function follows the final training protocol:
+    1. Standardizes the features (x1, x2) using statistics computed from the entire training set.
+    2. Trains the model on the full, standardized training data for a fixed number of epochs.
+    3. Standardizes the test features (test_x1, test_x2) using the same statistics from the training set.
+    4. Generates and returns predictions for the standardized test set.
+
+    Args:
+        model (nn.Module): The model to be trained.
+        x1 (torch.Tensor): The first feature tensor of the entire training set.
+        x2 (torch.Tensor): The second feature tensor of the entire training set.
+        y (torch.Tensor): The target tensor for the entire training set.
+        test_x1 (torch.Tensor): The first feature tensor of the test set.
+        test_x2 (torch.Tensor): The second feature tensor of the test set.
+        num_epochs (int): The fixed number of epochs to train for.
+        learning_rate (float): The learning rate for the optimizer.
+        batch_size (int): The batch size for DataLoaders.
+        device (str): The device to run the training and prediction on ('cuda' or 'cpu').
+        padding_value (float): The value used for padding sequences.
+        num_workers (int): Number of workers for the DataLoader.
+        random_state (int): Random seed for shuffling the training data.
+
+    Returns:
+        torch.Tensor: The predictions for the test set.
+    """
+    print("--- Starting Final Model Training and Prediction ---")
+    model.to(device)
+
+    # 1. Standardize the full training data
+    print("Step 1: Computing standardization stats from the full training data...")
+    lengths1 = get_sequence_lengths(x1, padding_value)
+    lengths2 = get_sequence_lengths(x2, padding_value)
+    mask1 = create_mask_from_lengths(lengths1, x1.size(1))
+    mask2 = create_mask_from_lengths(lengths2, x2.size(1))
+
+    x1_mean, x1_std = compute_standardization_stats(x1, mask1, dim=(0, 1))
+    x2_mean, x2_std = compute_standardization_stats(x2, mask2, dim=(0, 1))
+
+    x1_standardized = standardize_data(x1, x1_mean, x1_std, mask1, padding_value)
+    x2_standardized = standardize_data(x2, x2_mean, x2_std, mask2, padding_value)
+    print("Standardization complete.")
+
+    # 2. Create DataLoader for the full training data
+    full_train_dataset = TimeSeriesDataset(x1_standardized, x2_standardized, y, lengths1, lengths2, padding_value)
+
+    loader_kwargs = dict(batch_size=batch_size, num_workers=num_workers, pin_memory=True)
+    # Shuffle is True for the final training run
+    full_train_loader = torch.utils.data.DataLoader(full_train_dataset, shuffle=True, **loader_kwargs,
+                                                    generator=torch.Generator().manual_seed(random_state))
+
+    # 3. Train the model for a fixed number of epochs
+    print(f"\nStep 2: Training model on full dataset for {num_epochs} epochs...")
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    for epoch in range(num_epochs):
+        train_loss = train_epoch(model, full_train_loader, criterion, optimizer, device)
+        print(f"Epoch {epoch + 1}/{num_epochs} | Train Loss: {train_loss:.6f}")
+    print("Final training complete.")
+
+    # 4. Standardize the test data using the *training* stats
+    print("\nStep 3: Standardizing test data using training set statistics...")
+    test_lengths1 = get_sequence_lengths(test_x1, padding_value)
+    test_lengths2 = get_sequence_lengths(test_x2, padding_value)
+    test_mask1 = create_mask_from_lengths(test_lengths1, test_x1.size(1))
+    test_mask2 = create_mask_from_lengths(test_lengths2, test_x2.size(1))
+
+    test_x1_standardized = standardize_data(test_x1, x1_mean, x1_std, test_mask1, padding_value)
+    test_x2_standardized = standardize_data(test_x2, x2_mean, x2_std, test_mask2, padding_value)
+
+    # 5. Generate predictions on the full test matrix
+    print("\nStep 4: Generating predictions on the test set...")
+    model.eval()
+    pred_y = None
+    with torch.no_grad():
+        # Move all required tensors to the correct device
+        test_x1_dev = test_x1_standardized.to(device)
+        test_x2_dev = test_x2_standardized.to(device)
+        test_lengths1_dev = test_lengths1.to(device)
+        test_lengths2_dev = test_lengths2.to(device)
+
+        # Run the entire test set through the model in one pass
+        pred_y = model(test_x1_dev, test_x2_dev, test_lengths1_dev, test_lengths2_dev)
+
+        # Move final predictions to CPU
+        pred_y = pred_y.cpu()
+
+    print("Prediction generation complete.")
+    print("--- Process Finished ---")
+
+    return pred_y

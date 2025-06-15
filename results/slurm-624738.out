@@ -1,0 +1,558 @@
+/home/y/yuchenbo/anaconda3/envs/nlp_2025/lib/python3.11/site-packages/torch/optim/lr_scheduler.py:62: UserWarning: The verbose parameter is deprecated. Please use get_last_lr() to access the learning rate.
+  warnings.warn(
+torch.Size([4140, 755, 20]) torch.Size([4140, 755, 45]) torch.Size([4140, 49])
+==========================================================================================
+Layer (type:depth-idx)                   Output Shape              Param #
+==========================================================================================
+BidirectionalDualLSTMModel               [32, 49]                  --
+├─LSTM: 1-1                              [22400, 256]              1,734,656
+├─LSTM: 1-2                              [22400, 256]              1,760,256
+├─Sequential: 1-3                        [32, 49]                  --
+│    └─Linear: 2-1                       [32, 512]                 262,656
+│    └─ReLU: 2-2                         [32, 512]                 --
+│    └─Dropout: 2-3                      [32, 512]                 --
+│    └─Linear: 2-4                       [32, 256]                 131,328
+│    └─ReLU: 2-5                         [32, 256]                 --
+│    └─Dropout: 2-6                      [32, 256]                 --
+│    └─Linear: 2-7                       [32, 49]                  12,593
+==========================================================================================
+Total params: 3,901,489
+Trainable params: 3,901,489
+Non-trainable params: 0
+Total mult-adds (Units.TERABYTES): 20.04
+==========================================================================================
+Input size (MB): 6.28
+Forward/backward pass size (MB): 91.96
+Params size (MB): 15.61
+Estimated Total Size (MB): 113.85
+==========================================================================================
+Epoch 1/400
+Train Loss: 11.178707, Val Loss: 0.024875
+Learning Rate: 1.00e-03
+--------------------
+Epoch 2/400
+Train Loss: 0.025139, Val Loss: 0.025217
+Learning Rate: 1.00e-03
+--------------------
+Epoch 3/400
+Train Loss: 0.025638, Val Loss: 0.032438
+Learning Rate: 1.00e-03
+--------------------
+Epoch 4/400
+Train Loss: 0.026421, Val Loss: 0.035233
+Learning Rate: 1.00e-03
+--------------------
+Epoch 5/400
+Train Loss: 0.027648, Val Loss: 0.026188
+Learning Rate: 1.00e-03
+--------------------
+Epoch 6/400
+Train Loss: 0.027946, Val Loss: 0.022186
+Learning Rate: 1.00e-03
+--------------------
+Epoch 7/400
+Train Loss: 0.023288, Val Loss: 0.019124
+Learning Rate: 1.00e-03
+--------------------
+Epoch 8/400
+Train Loss: 0.010586, Val Loss: 0.013517
+Learning Rate: 1.00e-03
+--------------------
+Epoch 9/400
+Train Loss: 0.006861, Val Loss: 0.011222
+Learning Rate: 1.00e-03
+--------------------
+Epoch 10/400
+Train Loss: 0.006209, Val Loss: 0.014786
+Learning Rate: 1.00e-03
+--------------------
+Epoch 11/400
+Train Loss: 0.006235, Val Loss: 0.011286
+Learning Rate: 1.00e-03
+--------------------
+Epoch 12/400
+Train Loss: 0.006314, Val Loss: 0.011179
+Learning Rate: 1.00e-03
+--------------------
+Epoch 13/400
+Train Loss: 0.006166, Val Loss: 0.009968
+Learning Rate: 1.00e-03
+--------------------
+Epoch 14/400
+Train Loss: 0.006327, Val Loss: 0.008783
+Learning Rate: 1.00e-03
+--------------------
+Epoch 15/400
+Train Loss: 0.006687, Val Loss: 0.006997
+Learning Rate: 1.00e-03
+--------------------
+Epoch 16/400
+Train Loss: 0.006425, Val Loss: 0.004684
+Learning Rate: 1.00e-03
+--------------------
+Epoch 17/400
+Train Loss: 0.006138, Val Loss: 0.005162
+Learning Rate: 1.00e-03
+--------------------
+Epoch 18/400
+Train Loss: 0.006269, Val Loss: 0.005954
+Learning Rate: 1.00e-03
+--------------------
+Epoch 19/400
+Train Loss: 0.006352, Val Loss: 0.005750
+Learning Rate: 1.00e-03
+--------------------
+Epoch 20/400
+Train Loss: 0.006344, Val Loss: 0.004436
+Learning Rate: 1.00e-03
+--------------------
+Epoch 21/400
+Train Loss: 0.006351, Val Loss: 0.004451
+Learning Rate: 1.00e-03
+--------------------
+Epoch 22/400
+Train Loss: 0.006299, Val Loss: 0.004598
+Learning Rate: 1.00e-03
+--------------------
+Epoch 23/400
+Train Loss: 0.006157, Val Loss: 0.004955
+Learning Rate: 1.00e-03
+--------------------
+Epoch 24/400
+Train Loss: 0.005960, Val Loss: 0.005529
+Learning Rate: 1.00e-03
+--------------------
+Epoch 25/400
+Train Loss: 0.005618, Val Loss: 0.004641
+Learning Rate: 1.00e-03
+--------------------
+Epoch 26/400
+Train Loss: 0.005512, Val Loss: 0.004624
+Learning Rate: 5.00e-04
+--------------------
+Epoch 27/400
+Train Loss: 0.004889, Val Loss: 0.008791
+Learning Rate: 5.00e-04
+--------------------
+Epoch 28/400
+Train Loss: 0.005234, Val Loss: 0.007434
+Learning Rate: 5.00e-04
+--------------------
+Epoch 29/400
+Train Loss: 0.005250, Val Loss: 0.006622
+Learning Rate: 5.00e-04
+--------------------
+Epoch 30/400
+Train Loss: 0.005374, Val Loss: 0.006611
+Learning Rate: 5.00e-04
+--------------------
+Epoch 31/400
+Train Loss: 0.005751, Val Loss: 0.005517
+Learning Rate: 5.00e-04
+--------------------
+Epoch 32/400
+Train Loss: 0.005309, Val Loss: 0.004093
+Learning Rate: 5.00e-04
+--------------------
+Epoch 33/400
+Train Loss: 0.005398, Val Loss: 0.004474
+Learning Rate: 5.00e-04
+--------------------
+Epoch 34/400
+Train Loss: 0.005237, Val Loss: 0.005092
+Learning Rate: 5.00e-04
+--------------------
+Epoch 35/400
+Train Loss: 0.004950, Val Loss: 0.006952
+Learning Rate: 5.00e-04
+--------------------
+Epoch 36/400
+Train Loss: 0.004863, Val Loss: 0.006899
+Learning Rate: 5.00e-04
+--------------------
+Epoch 37/400
+Train Loss: 0.005115, Val Loss: 0.005342
+Learning Rate: 5.00e-04
+--------------------
+Epoch 38/400
+Train Loss: 0.005179, Val Loss: 0.004192
+Learning Rate: 2.50e-04
+--------------------
+Epoch 39/400
+Train Loss: 0.003938, Val Loss: 0.006079
+Learning Rate: 2.50e-04
+--------------------
+Epoch 40/400
+Train Loss: 0.003383, Val Loss: 0.006416
+Learning Rate: 2.50e-04
+--------------------
+Epoch 41/400
+Train Loss: 0.003817, Val Loss: 0.007912
+Learning Rate: 2.50e-04
+--------------------
+Epoch 42/400
+Train Loss: 0.004222, Val Loss: 0.009986
+Learning Rate: 2.50e-04
+--------------------
+Epoch 43/400
+Train Loss: 0.003741, Val Loss: 0.009395
+Learning Rate: 2.50e-04
+--------------------
+Epoch 44/400
+Train Loss: 0.003500, Val Loss: 0.008426
+Learning Rate: 1.25e-04
+--------------------
+Epoch 45/400
+Train Loss: 0.003516, Val Loss: 0.005725
+Learning Rate: 1.25e-04
+--------------------
+Epoch 46/400
+Train Loss: 0.003232, Val Loss: 0.005515
+Learning Rate: 1.25e-04
+--------------------
+Epoch 47/400
+Train Loss: 0.003239, Val Loss: 0.004632
+Learning Rate: 1.25e-04
+--------------------
+Epoch 48/400
+Train Loss: 0.003179, Val Loss: 0.004679
+Learning Rate: 1.25e-04
+--------------------
+Epoch 49/400
+Train Loss: 0.003143, Val Loss: 0.004566
+Learning Rate: 1.25e-04
+--------------------
+Epoch 50/400
+Train Loss: 0.003274, Val Loss: 0.004559
+Learning Rate: 6.25e-05
+--------------------
+Epoch 51/400
+Train Loss: 0.002957, Val Loss: 0.003783
+Learning Rate: 6.25e-05
+--------------------
+Epoch 52/400
+Train Loss: 0.002956, Val Loss: 0.003905
+Learning Rate: 6.25e-05
+--------------------
+Epoch 53/400
+Train Loss: 0.002933, Val Loss: 0.003937
+Learning Rate: 6.25e-05
+--------------------
+Epoch 54/400
+Train Loss: 0.002923, Val Loss: 0.004190
+Learning Rate: 6.25e-05
+--------------------
+Epoch 55/400
+Train Loss: 0.002893, Val Loss: 0.004344
+Learning Rate: 6.25e-05
+--------------------
+Epoch 56/400
+Train Loss: 0.002830, Val Loss: 0.004466
+Learning Rate: 6.25e-05
+--------------------
+Epoch 57/400
+Train Loss: 0.002726, Val Loss: 0.004719
+Learning Rate: 3.13e-05
+--------------------
+Epoch 58/400
+Train Loss: 0.002562, Val Loss: 0.003956
+Learning Rate: 3.13e-05
+--------------------
+Epoch 59/400
+Train Loss: 0.002488, Val Loss: 0.003793
+Learning Rate: 3.13e-05
+--------------------
+Epoch 60/400
+Train Loss: 0.002426, Val Loss: 0.003726
+Learning Rate: 3.13e-05
+--------------------
+Epoch 61/400
+Train Loss: 0.002376, Val Loss: 0.003556
+Learning Rate: 3.13e-05
+--------------------
+Epoch 62/400
+Train Loss: 0.002338, Val Loss: 0.003179
+Learning Rate: 3.13e-05
+--------------------
+Epoch 63/400
+Train Loss: 0.002267, Val Loss: 0.003359
+Learning Rate: 3.13e-05
+--------------------
+Epoch 64/400
+Train Loss: 0.002213, Val Loss: 0.003340
+Learning Rate: 3.13e-05
+--------------------
+Epoch 65/400
+Train Loss: 0.002178, Val Loss: 0.003405
+Learning Rate: 3.13e-05
+--------------------
+Epoch 66/400
+Train Loss: 0.002154, Val Loss: 0.003282
+Learning Rate: 3.13e-05
+--------------------
+Epoch 67/400
+Train Loss: 0.002135, Val Loss: 0.003301
+Learning Rate: 3.13e-05
+--------------------
+Epoch 68/400
+Train Loss: 0.002094, Val Loss: 0.003143
+Learning Rate: 3.13e-05
+--------------------
+Epoch 69/400
+Train Loss: 0.002091, Val Loss: 0.003081
+Learning Rate: 3.13e-05
+--------------------
+Epoch 70/400
+Train Loss: 0.002083, Val Loss: 0.002948
+Learning Rate: 3.13e-05
+--------------------
+Epoch 71/400
+Train Loss: 0.002051, Val Loss: 0.002998
+Learning Rate: 3.13e-05
+--------------------
+Epoch 72/400
+Train Loss: 0.002064, Val Loss: 0.002932
+Learning Rate: 3.13e-05
+--------------------
+Epoch 73/400
+Train Loss: 0.002078, Val Loss: 0.002772
+Learning Rate: 3.13e-05
+--------------------
+Epoch 74/400
+Train Loss: 0.002023, Val Loss: 0.002996
+Learning Rate: 3.13e-05
+--------------------
+Epoch 75/400
+Train Loss: 0.002038, Val Loss: 0.003051
+Learning Rate: 3.13e-05
+--------------------
+Epoch 76/400
+Train Loss: 0.001975, Val Loss: 0.003184
+Learning Rate: 3.13e-05
+--------------------
+Epoch 77/400
+Train Loss: 0.001948, Val Loss: 0.003227
+Learning Rate: 3.13e-05
+--------------------
+Epoch 78/400
+Train Loss: 0.001961, Val Loss: 0.003305
+Learning Rate: 3.13e-05
+--------------------
+Epoch 79/400
+Train Loss: 0.001937, Val Loss: 0.003400
+Learning Rate: 1.56e-05
+--------------------
+Epoch 80/400
+Train Loss: 0.001855, Val Loss: 0.003230
+Learning Rate: 1.56e-05
+--------------------
+Epoch 81/400
+Train Loss: 0.001831, Val Loss: 0.003236
+Learning Rate: 1.56e-05
+--------------------
+Epoch 82/400
+Train Loss: 0.001800, Val Loss: 0.003057
+Learning Rate: 1.56e-05
+--------------------
+Epoch 83/400
+Train Loss: 0.001802, Val Loss: 0.003162
+Learning Rate: 1.56e-05
+--------------------
+Epoch 84/400
+Train Loss: 0.001780, Val Loss: 0.003094
+Learning Rate: 1.56e-05
+--------------------
+Epoch 85/400
+Train Loss: 0.001796, Val Loss: 0.003046
+Learning Rate: 7.81e-06
+--------------------
+Epoch 86/400
+Train Loss: 0.001759, Val Loss: 0.002779
+Learning Rate: 7.81e-06
+--------------------
+Epoch 87/400
+Train Loss: 0.001745, Val Loss: 0.002786
+Learning Rate: 7.81e-06
+--------------------
+Epoch 88/400
+Train Loss: 0.001752, Val Loss: 0.002857
+Learning Rate: 7.81e-06
+--------------------
+Epoch 89/400
+Train Loss: 0.001744, Val Loss: 0.002816
+Learning Rate: 7.81e-06
+--------------------
+Epoch 90/400
+Train Loss: 0.001744, Val Loss: 0.002804
+Learning Rate: 7.81e-06
+--------------------
+Epoch 91/400
+Train Loss: 0.001742, Val Loss: 0.002810
+Learning Rate: 3.91e-06
+--------------------
+Epoch 92/400
+Train Loss: 0.001717, Val Loss: 0.002386
+Learning Rate: 3.91e-06
+--------------------
+Epoch 93/400
+Train Loss: 0.001724, Val Loss: 0.002434
+Learning Rate: 3.91e-06
+--------------------
+Epoch 94/400
+Train Loss: 0.001728, Val Loss: 0.002461
+Learning Rate: 3.91e-06
+--------------------
+Epoch 95/400
+Train Loss: 0.001736, Val Loss: 0.002468
+Learning Rate: 3.91e-06
+--------------------
+Epoch 96/400
+Train Loss: 0.001716, Val Loss: 0.002511
+Learning Rate: 3.91e-06
+--------------------
+Epoch 97/400
+Train Loss: 0.001716, Val Loss: 0.002460
+Learning Rate: 3.91e-06
+--------------------
+Epoch 98/400
+Train Loss: 0.001713, Val Loss: 0.002457
+Learning Rate: 1.95e-06
+--------------------
+Epoch 99/400
+Train Loss: 0.001699, Val Loss: 0.002495
+Learning Rate: 1.95e-06
+--------------------
+Epoch 100/400
+Train Loss: 0.001705, Val Loss: 0.002479
+Learning Rate: 1.95e-06
+--------------------
+Epoch 101/400
+Train Loss: 0.001715, Val Loss: 0.002470
+Learning Rate: 1.95e-06
+--------------------
+Epoch 102/400
+Train Loss: 0.001713, Val Loss: 0.002430
+Learning Rate: 1.95e-06
+--------------------
+Epoch 103/400
+Train Loss: 0.001703, Val Loss: 0.002433
+Learning Rate: 1.95e-06
+--------------------
+Epoch 104/400
+Train Loss: 0.001700, Val Loss: 0.002485
+Learning Rate: 9.77e-07
+--------------------
+Epoch 105/400
+Train Loss: 0.001701, Val Loss: 0.002773
+Learning Rate: 9.77e-07
+--------------------
+Epoch 106/400
+Train Loss: 0.001695, Val Loss: 0.002753
+Learning Rate: 9.77e-07
+--------------------
+Epoch 107/400
+Train Loss: 0.001694, Val Loss: 0.002744
+Learning Rate: 9.77e-07
+--------------------
+Epoch 108/400
+Train Loss: 0.001690, Val Loss: 0.002748
+Learning Rate: 9.77e-07
+--------------------
+Epoch 109/400
+Train Loss: 0.001698, Val Loss: 0.002741
+Learning Rate: 9.77e-07
+--------------------
+Epoch 110/400
+Train Loss: 0.001691, Val Loss: 0.002714
+Learning Rate: 4.88e-07
+--------------------
+Epoch 111/400
+Train Loss: 0.001686, Val Loss: 0.002895
+Learning Rate: 4.88e-07
+--------------------
+Epoch 112/400
+Train Loss: 0.001677, Val Loss: 0.002891
+Learning Rate: 4.88e-07
+--------------------
+Epoch 113/400
+Train Loss: 0.001680, Val Loss: 0.002870
+Learning Rate: 4.88e-07
+--------------------
+Epoch 114/400
+Train Loss: 0.001683, Val Loss: 0.002869
+Learning Rate: 4.88e-07
+--------------------
+Epoch 115/400
+Train Loss: 0.001689, Val Loss: 0.002881
+Learning Rate: 4.88e-07
+--------------------
+Epoch 116/400
+Train Loss: 0.001681, Val Loss: 0.002877
+Learning Rate: 2.44e-07
+--------------------
+Epoch 117/400
+Train Loss: 0.001676, Val Loss: 0.002876
+Learning Rate: 2.44e-07
+--------------------
+Epoch 118/400
+Train Loss: 0.001682, Val Loss: 0.002888
+Learning Rate: 2.44e-07
+--------------------
+Epoch 119/400
+Train Loss: 0.001680, Val Loss: 0.002892
+Learning Rate: 2.44e-07
+--------------------
+Epoch 120/400
+Train Loss: 0.001672, Val Loss: 0.002882
+Learning Rate: 2.44e-07
+--------------------
+Epoch 121/400
+Train Loss: 0.001682, Val Loss: 0.002902
+Learning Rate: 2.44e-07
+--------------------
+Epoch 122/400
+Train Loss: 0.001679, Val Loss: 0.002883
+Learning Rate: 1.22e-07
+--------------------
+Epoch 123/400
+Train Loss: 0.001679, Val Loss: 0.002865
+Learning Rate: 1.22e-07
+--------------------
+Epoch 124/400
+Train Loss: 0.001683, Val Loss: 0.002857
+Learning Rate: 1.22e-07
+--------------------
+Epoch 125/400
+Train Loss: 0.001676, Val Loss: 0.002857
+Learning Rate: 1.22e-07
+--------------------
+Epoch 126/400
+Train Loss: 0.001675, Val Loss: 0.002867
+Learning Rate: 1.22e-07
+--------------------
+Epoch 127/400
+Train Loss: 0.001672, Val Loss: 0.002863
+Learning Rate: 1.22e-07
+--------------------
+Epoch 128/400
+Train Loss: 0.001674, Val Loss: 0.002870
+Learning Rate: 6.10e-08
+--------------------
+Epoch 129/400
+Train Loss: 0.001678, Val Loss: 0.002855
+Learning Rate: 6.10e-08
+--------------------
+Epoch 130/400
+Train Loss: 0.001681, Val Loss: 0.002860
+Learning Rate: 6.10e-08
+--------------------
+Epoch 131/400
+Train Loss: 0.001674, Val Loss: 0.002859
+Learning Rate: 6.10e-08
+--------------------
+Epoch 132/400
+Train Loss: 0.001676, Val Loss: 0.002849
+Learning Rate: 6.10e-08
+Early stopping at epoch 132.
+Testing model on 26 batches...
+{'test_loss': 0.0024397307872557296, 'mse': 0.0024422481656074524, 'mae': 0.03732556477189064, 'r2_score': 0.9190551042556763}
