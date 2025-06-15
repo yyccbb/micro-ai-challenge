@@ -277,11 +277,10 @@ def train_and_predict_with_validation(
         padding_value=0.0,
         num_workers=0,
         random_state=42,
-        weight_decay=1e-2,
         # --- Early stopping and Scheduler parameters ---
         patience=10,
         min_delta=1e-4,
-        model_save_path="best_model_val.pth"
+        model_save_path="best_final_model.pth"
 ):
     """
     Splits data into train/val, trains with early stopping, and predicts on a test set.
