@@ -2,6 +2,8 @@ import os
 import torch
 import torch.nn as nn
 import math
+import random
+import numpy as np
 
 from joblib import load
 from torchinfo import summary
@@ -22,6 +24,14 @@ AGGREGATION = 'mean' # mean, max, last, first
 USE_TEMPORAL_ENCODING = True
 TRANSFORMER_DROPOUT = 0.1
 COMMON_DROPOUT = 0.2
+
+def set_seed(seed=RANDOM_STATE):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
 class TemporalEncoding(nn.Module):
     def __init__(self, d_model, max_len=1000, dropout=0.2):
@@ -214,6 +224,7 @@ class FullTransformer(nn.Module):
 
 
 if __name__ == "__main__":
+    set_seed(RANDOM_STATE)
     model = FullTransformer(
         run_feature_size=20,
         incoming_feature_size=45,
