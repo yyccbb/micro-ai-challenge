@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import pandas as pd
 import os
@@ -7,6 +8,7 @@ import torch
 import torch.nn as nn
 
 from joblib import load
+from torchinfo import summary
 from tqdm import tqdm
 
 from utils import create_data_loaders, train_model, test_model
@@ -17,6 +19,14 @@ NUM_EPOCHS = 100
 LEARNING_RATE = 1e-3
 PATIENCE = 20
 MIN_DELTA = 1e-4
+
+def set_seed(seed=RANDOM_STATE):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
 class BidirectionalDualLSTMModel(nn.Module):
     def __init__(self,
@@ -109,66 +119,63 @@ class BidirectionalDualLSTMModel(nn.Module):
         return self.feed_forward(combined_features)
 
 
-# Model summary
-from torchinfo import summary
+if __name__ == "__main__":
+    set_seed(RANDOM_STATE)
+    # Load data
+    directory_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-model = BidirectionalDualLSTMModel()
+    run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
+    incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
+    metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix.joblib'))
 
-summary(
-    model,
-    input_data=(
-        torch.randn(32, 755, 20),  # x1: batch_size=32, seq_len=755, feature_dim=20
-        torch.randn(32, 755, 45),  # x2: batch_size=32, seq_len=755, feature_dim=45
-        torch.full((32,), 700),  # lengths1
-        torch.full((32,), 700)  # lengths2
+    X_run = torch.from_numpy(run_matrices).float()
+    X_incoming_run = torch.from_numpy(incoming_run_matrices).float()
+    y = torch.from_numpy(metrology_matrix).float()
+    print(X_run.shape, X_incoming_run.shape, y.shape)
+
+    # Initialize bidirectional model
+    bidirectional_model = BidirectionalDualLSTMModel(
+        run_hidden_size=128,
+        incoming_run_hidden_size=128,
+        num_layers=1,
+        lstm_dropout=0.5,
+        ff_dropout=0.2,
+        ff_hidden_sizes=[256, 128]
     )
-)
 
-# Load data
-directory_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    summary(
+        bidirectional_model,
+        input_data=(
+            torch.randn(32, 755, 20),  # x1: batch_size=32, seq_len=755, feature_dim=20
+            torch.randn(32, 755, 45),  # x2: batch_size=32, seq_len=755, feature_dim=45
+            torch.full((32,), 700),  # lengths1
+            torch.full((32,), 700)  # lengths2
+        )
+    )
 
-run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
-incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
-metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix.joblib'))
+    # Create data loaders
+    train_loader, val_loader, test_loader = create_data_loaders(
+        X_run, X_incoming_run, y,
+        train_ratio=0.7,
+        val_ratio=0.1,
+        batch_size=BATCH_SIZE,
+        standardize=True,
+        random_state=RANDOM_STATE
+    )
 
-X_run = torch.from_numpy(run_matrices).float()
-X_incoming_run = torch.from_numpy(incoming_run_matrices).float()
-y = torch.from_numpy(metrology_matrix).float()
-print(X_run.shape, X_incoming_run.shape, y.shape)
+    # Train the model
+    train_losses, val_losses = train_model(
+        bidirectional_model,
+        train_loader,
+        val_loader,
+        num_epochs=NUM_EPOCHS,
+        learning_rate=LEARNING_RATE,
+        patience=PATIENCE,
+        min_delta=MIN_DELTA,
+        model_save_path='bidirectional-best-model.pth'
+    )
 
-# Initialize bidirectional model
-bidirectional_model = BidirectionalDualLSTMModel(
-    run_hidden_size=128,
-    incoming_run_hidden_size=128,
-    num_layers=1,
-    lstm_dropout=0.5,
-    ff_dropout=0.2,
-    ff_hidden_sizes=[256, 128]
-)
+    # Test the model
+    test_results = test_model(bidirectional_model, test_loader)
 
-# Create data loaders
-train_loader, val_loader, test_loader = create_data_loaders(
-    X_run, X_incoming_run, y,
-    train_ratio=0.7,
-    val_ratio=0.1,
-    batch_size=BATCH_SIZE,
-    standardize=True,
-    random_state=RANDOM_STATE
-)
-
-# Train the model
-train_losses, val_losses = train_model(
-    bidirectional_model,
-    train_loader,
-    val_loader,
-    num_epochs=NUM_EPOCHS,
-    learning_rate=LEARNING_RATE,
-    patience=PATIENCE,
-    min_delta=MIN_DELTA,
-    model_save_path='bidirectional-best-model.pth'
-)
-
-# Test the model
-test_results = test_model(bidirectional_model, test_loader)
-
-print({k: test_results[k] for k in ['test_loss', 'mse', 'mae', 'r2_score']})
+    print({k: test_results[k] for k in ['test_loss', 'mse', 'mae', 'r2_score']})

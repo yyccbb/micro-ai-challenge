@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import pandas as pd
 import os
@@ -13,7 +14,6 @@ from tqdm import tqdm
 
 from utils import create_data_loaders, train_model, test_model
 
-
 RANDOM_STATE = 42
 BATCH_SIZE = 32
 NUM_EPOCHS = 100
@@ -25,6 +25,14 @@ N_LAYERS = 1
 LSTM_HIDDEN_SIZE = 128
 FF_HIDDEN_SIZE = [256, 128]
 ATTENTION_SIZE = 128
+
+def set_seed(seed=RANDOM_STATE):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
 class LSTMAttention(nn.Module):
     def __init__(self, hidden_size, attention_size=128):
@@ -171,76 +179,79 @@ class BidirectionalDualLSTMWithAttention(nn.Module):
         # Returns None if the attribute does not exist
         return getattr(self, 'last_attention_weights', None)
 
-# Load data
-directory_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if __name__ == "__main__":
+    set_seed(RANDOM_STATE)
 
-run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
-incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
-metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix.joblib'))
+    # Load data
+    directory_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-X_run = torch.from_numpy(run_matrices).float()
-X_incoming_run = torch.from_numpy(incoming_run_matrices).float()
-y = torch.from_numpy(metrology_matrix).float()
-print(X_run.shape, X_incoming_run.shape, y.shape)
+    run_matrices = load(os.path.join(directory_path, 'data/processed/run_matrices.joblib'))
+    incoming_run_matrices = load(os.path.join(directory_path, 'data/processed/incoming_run_matrices.joblib'))
+    metrology_matrix = load(os.path.join(directory_path, 'data/processed/metrology_matrix.joblib'))
 
-# Initialize bidirectional model with attention
-attention_model = BidirectionalDualLSTMWithAttention(
-    run_hidden_size=LSTM_HIDDEN_SIZE,
-    incoming_run_hidden_size=LSTM_HIDDEN_SIZE,
-    num_layers=N_LAYERS,
-    dropout=0.2,
-    attention_size=ATTENTION_SIZE,
-    ff_hidden_sizes=FF_HIDDEN_SIZE
-)
+    X_run = torch.from_numpy(run_matrices).float()
+    X_incoming_run = torch.from_numpy(incoming_run_matrices).float()
+    y = torch.from_numpy(metrology_matrix).float()
+    print(X_run.shape, X_incoming_run.shape, y.shape)
 
-summary(
-    attention_model,
-    input_data=(
-        torch.randn(32, 755, 20),  # x1: batch_size=32, seq_len=755, feature_dim=20
-        torch.randn(32, 755, 45),  # x2: batch_size=32, seq_len=755, feature_dim=45
-        torch.full((32,), 700),  # lengths1
-        torch.full((32,), 700)  # lengths2
+    # Initialize bidirectional model with attention
+    attention_model = BidirectionalDualLSTMWithAttention(
+        run_hidden_size=LSTM_HIDDEN_SIZE,
+        incoming_run_hidden_size=LSTM_HIDDEN_SIZE,
+        num_layers=N_LAYERS,
+        dropout=0.2,
+        attention_size=ATTENTION_SIZE,
+        ff_hidden_sizes=FF_HIDDEN_SIZE
     )
-)
 
-# Create data loaders
-train_loader, val_loader, test_loader = create_data_loaders(
-    X_run, X_incoming_run, y,
-    train_ratio=0.7,
-    val_ratio=0.1,
-    batch_size=BATCH_SIZE,
-    standardize=True,
-    random_state=RANDOM_STATE
-)
+    summary(
+        attention_model,
+        input_data=(
+            torch.randn(32, 755, 20),  # x1: batch_size=32, seq_len=755, feature_dim=20
+            torch.randn(32, 755, 45),  # x2: batch_size=32, seq_len=755, feature_dim=45
+            torch.full((32,), 700),  # lengths1
+            torch.full((32,), 700)  # lengths2
+        )
+    )
 
-# Train the model
-train_losses, val_losses = train_model(
-    attention_model,
-    train_loader,
-    val_loader,
-    num_epochs=NUM_EPOCHS,
-    learning_rate=LEARNING_RATE,
-    patience=PATIENCE,
-    min_delta=MIN_DELTA,
-    model_save_path='bidirectional-lstm-attention-best-model.pth'
-)
+    # Create data loaders
+    train_loader, val_loader, test_loader = create_data_loaders(
+        X_run, X_incoming_run, y,
+        train_ratio=0.7,
+        val_ratio=0.1,
+        batch_size=BATCH_SIZE,
+        standardize=True,
+        random_state=RANDOM_STATE
+    )
 
-# Test the model
-test_results = test_model(attention_model, test_loader)
+    # Train the model
+    train_losses, val_losses = train_model(
+        attention_model,
+        train_loader,
+        val_loader,
+        num_epochs=NUM_EPOCHS,
+        learning_rate=LEARNING_RATE,
+        patience=PATIENCE,
+        min_delta=MIN_DELTA,
+        model_save_path='bidirectional-lstm-attention-best-model.pth'
+    )
 
-print({k: test_results[k] for k in ['test_loss', 'mse', 'mae', 'r2_score']})
+    # Test the model
+    test_results = test_model(attention_model, test_loader)
 
-# # Example: Visualize attention weights for a sample
-# print("\nGetting attention weights for interpretation...")
-# attention_model.eval()
-# with torch.no_grad():
-#     sample_batch = next(iter(test_loader))
-#     x1, x2, y, lengths1, lengths2 = sample_batch
-#
-#     # Get predictions and attention weights
-#     predictions = attention_model(x1, x2, lengths1, lengths2)
-#     attention_weights = attention_model.get_attention_weights()
-#
-#     print(f"Run attention shape: {attention_weights['run_attention'].shape}")
-#     print(f"Incoming run attention shape: {attention_weights['incoming_run_attention'].shape}")
-#     print(f"Sample attention weights (first sequence): {attention_weights['run_attention'][0][:10]}")
+    print({k: test_results[k] for k in ['test_loss', 'mse', 'mae', 'r2_score']})
+
+    # # Example: Visualize attention weights for a sample
+    # print("\nGetting attention weights for interpretation...")
+    # attention_model.eval()
+    # with torch.no_grad():
+    #     sample_batch = next(iter(test_loader))
+    #     x1, x2, y, lengths1, lengths2 = sample_batch
+    #
+    #     # Get predictions and attention weights
+    #     predictions = attention_model(x1, x2, lengths1, lengths2)
+    #     attention_weights = attention_model.get_attention_weights()
+    #
+    #     print(f"Run attention shape: {attention_weights['run_attention'].shape}")
+    #     print(f"Incoming run attention shape: {attention_weights['incoming_run_attention'].shape}")
+    #     print(f"Sample attention weights (first sequence): {attention_weights['run_attention'][0][:10]}")
