@@ -410,7 +410,7 @@ def train_and_predict_with_validation(
         pred_y = model(test_x1_dev, test_x2_dev, test_lengths1_dev, test_lengths2_dev)
         pred_y = pred_y.cpu()
 
-    dump(pred_y, 'predicted_y.joblib')
+    dump(pred_y, 'prediction/predicted_y.joblib')
     print("Prediction generation complete.")
     print("--- Process Finished ---")
     return pred_y
