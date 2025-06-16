@@ -8,6 +8,7 @@ data/
 *.parquet
 *.pth
 *.joblib
+!prediction/predicted_y.joblib
 
 # bytecode directory
 __pycache__
